@@ -18,13 +18,13 @@ import (
 
 // UIOptions defines options for the console UI.
 type UIOptions struct {
-	NoColour      bool
-	MaxLines      int
-	MouseEnabled  bool
 	HelpExtra     []string
+	MaxLines      int
 	OnExit        func(code int)
-	DisableTopBar bool // false = show top bar (Title | Counters); true = legacy: no top bar
 	Rules         Config
+	NoColour      bool
+	MouseEnabled  bool
+	DisableTopBar bool // false = show top bar (Title | Counters); true = legacy: no top bar
 }
 
 type counterRule struct {
@@ -58,25 +58,23 @@ type UI struct {
 	prevFocus  tview.Primitive
 
 	// state
-	mu                  sync.Mutex
-	lines               []string
-	maxLines            int
-	filter              string
+	mu          sync.Mutex
+	counterMu   sync.Mutex
+	hlMu        sync.Mutex
+	lines       []string
+	helpExtra   []string
+	counters    []*counterRule
+	highlights  []*highlightRule
+	filter      string
+	title       string
+	maxLines    int
+	onExit      func(int)
 	filterActive        bool
 	filterCaseSensitive bool
 	paused              bool
 	mouseOn             bool
 	noColour            bool
-	title               string
-	helpExtra           []string
-	onExit              func(int)
 	topBarEnabled       bool // derived from !opts.DisableTopBar
-
-	// rules
-	counterMu  sync.Mutex
-	counters   []*counterRule
-	hlMu       sync.Mutex
-	highlights []*highlightRule
 }
 
 // New creates a new console UI with the given options.
@@ -1019,7 +1017,7 @@ func Attach(opts AttachOptions) error {
 			case "line":
 				var ev Line
 				if json.Unmarshal(b, &ev) == nil {
-					when := time.Unix(0, 0)
+					var when time.Time
 					if ev.TsUs > 0 {
 						when = time.UnixMicro(ev.TsUs)
 					} else {
