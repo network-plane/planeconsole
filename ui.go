@@ -943,7 +943,24 @@ func Attach(opts AttachOptions) error {
 			return errors.New("console attach: socket path not resolved")
 		}
 	}
-	conn, err := net.Dial("unix", path)
+	// Detect if path is a TCP address by trying to parse it as host:port
+	network := "unix"
+	if _, _, err := net.SplitHostPort(path); err == nil {
+		// Successfully parsed as host:port, so it's a TCP address
+		network = "tcp"
+	} else {
+		// Not in host:port format - check if it's an IP or hostname (not a UNIX socket path)
+		if ip := net.ParseIP(path); ip != nil {
+			// It's a valid IP address without a port, append default port
+			path = net.JoinHostPort(path, "9090")
+			network = "tcp"
+		} else if !strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "unix://") {
+			// Not a UNIX socket path (doesn't start with / or unix://), treat as hostname and append port
+			path = net.JoinHostPort(path, "9090")
+			network = "tcp"
+		}
+	}
+	conn, err := net.Dial(network, path)
 	if err != nil {
 		return fmt.Errorf("console attach: %w", err)
 	}
